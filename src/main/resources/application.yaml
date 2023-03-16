@@ -1,0 +1,9 @@
+kc:
+  connect:
+    bootstrap.servers: localhost:9092
+    key.converter: org.apache.kafka.connect.json.JsonConverter
+    value.converter: org.apache.kafka.connect.json.JsonConverter
+    offset.storage.file.filename: /tmp/connect.offsets
+    offset.flush.interval.ms: 10000
+    offset.storage.topic: "foo"
+
