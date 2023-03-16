@@ -2,11 +2,12 @@ package io.github.lburgazzoli.quarkus.ck;
 
 import java.util.Map;
 
-import io.quarkus.runtime.annotations.ConfigRoot;
 import io.smallrye.config.ConfigMapping;
 
 @ConfigMapping(prefix = "kc")
 public interface ApplicationConfig {
+
+    String id();
 
     Map<String, String> worker();
 
