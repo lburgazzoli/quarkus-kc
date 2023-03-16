@@ -9,7 +9,7 @@ public class ApplicationProducers {
     @Produces
     @Singleton
     public WorkerConfig config(ApplicationConfig config) {
-        return new ConnectConfig(config.connect());
+        return new ConnectConfig(config.worker());
     }
 
 }

@@ -8,7 +8,11 @@ import io.smallrye.config.ConfigMapping;
 @ConfigMapping(prefix = "kc")
 public interface ApplicationConfig {
 
-    Map<String, String> connect();
+    Map<String, String> worker();
 
-    Map<String, String> connector();
+    Map<String, Connector> connectors();
+
+    interface Connector {
+        Map<String, String> params();
+    }
 }

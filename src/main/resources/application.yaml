@@ -1,5 +1,5 @@
 kc:
-  connect:
+  worker:
     bootstrap.servers: localhost:9092
     key.converter: org.apache.kafka.connect.json.JsonConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter

@@ -62,7 +62,7 @@ public class Application implements QuarkusApplication {
 
             LOGGER.info("Scanning for plugin classes. This might take a moment ...");
 
-            Plugins plugins = new Plugins(appConfig.connect());
+            Plugins plugins = new Plugins(appConfig.worker());
             plugins.compareAndSwapWithDelegatingLoader();
 
             String kafkaClusterId = config.kafkaClusterId();
@@ -105,22 +105,25 @@ public class Application implements QuarkusApplication {
             try {
                 connect.start();
 
-                if (appConfig.connector() != null){
-                    FutureCallback<Herder.Created<ConnectorInfo>> cb = new FutureCallback<>((error, info) -> {
-                        if (error != null) {
-                            LOGGER.error("Failed to create job for {}", appConfig.connector());
-                        } else {
-                            LOGGER.info("Created connector {}", info.result().name());
-                        }
-                    });
+                if (appConfig.connectors() != null){
 
-                    herder.putConnectorConfig(
-                        appConfig.connector().get(ConnectorConfig.NAME_CONFIG),
-                        appConfig.connector(),
-                        false,
-                        cb);
+                    for (var entry: appConfig.connectors().entrySet()) {
+                        FutureCallback<Herder.Created<ConnectorInfo>> cb = new FutureCallback<>((error, info) -> {
+                            if (error != null) {
+                                LOGGER.error("Failed to create job for {}", entry.getKey());
+                            } else {
+                                LOGGER.info("Created connector {}", info.result().name());
+                            }
+                        });
 
-                    cb.get();
+                        herder.putConnectorConfig(
+                            entry.getKey(),
+                            entry.getValue().params(),
+                            false,
+                            cb);
+                        cb.get();
+
+                    }
                 }
             } catch (Throwable t) {
                 LOGGER.error("Stopping after connector error", t);
