@@ -41,7 +41,6 @@ public class Application implements QuarkusApplication {
     @Inject
     Worker worker;
 
-
     @Override
     public int run(String... args) throws Exception {
         ExecutorService executor = Executors.newFixedThreadPool(10);
@@ -80,6 +79,8 @@ public class Application implements QuarkusApplication {
                             connectorConfig,
                             false,
                             cb);
+
+                        cb.get();
                     }
                 }
             } catch (Throwable t) {

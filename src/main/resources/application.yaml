@@ -12,6 +12,8 @@ quarkus:
         level: ERROR
       "org.apache.kafka.connect.runtime.SourceConnectorConfig":
         level: ERROR
+      "org.apache.kafka.connect.runtime.ConnectorConfig":
+        level: ERROR
       "org.apache.kafka.connect.runtime.ConnectorConfig$EnrichedConnectorConfig":
         level: ERROR
       "org.apache.kafka.connect.json.JsonConverterConfig":
@@ -22,11 +24,14 @@ quarkus:
         level: ERROR
       "org.apache.kafka.clients.consumer.ConsumerConfig":
         level: ERROR
+      "org.apache.kafka.connect.runtime.TaskConfig":
+        level: ERROR
 
 
 kc:
   id: "${worker.id}"
   worker:
+    # rpk container start --nodes 3
     bootstrap.servers: '127.0.0.1:56252,127.0.0.1:56263,127.0.0.1:56261'
     #security.protocol: "SASL_SSL"
     #sasl.mechanism: "PLAIN"
@@ -37,6 +42,7 @@ kc:
     offset.flush.interval.ms: 10000
     offset.storage.topic: "${worker.id}-offset"
   connectors:
+    # docker run -d -p 5432:5432 -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=postgres debezium/example-postgres:1.4
     debezium:
       type: "io.debezium.connector.postgresql.PostgresConnector"
       config:
