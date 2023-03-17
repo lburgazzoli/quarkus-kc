@@ -15,6 +15,8 @@ public class ConnectConfig extends WorkerConfig {
     public static final String TOPIC_SUFFIX = "topic";
     public static final String PARTITIONS_SUFFIX = "partitions";
     public static final String REPLICATION_FACTOR_SUFFIX = "replication.factor";
+    public static final String OFFSET_STORAGE_FILE_FILENAME_CONFIG = "offset.storage.file.filename";
+    public static final String OFFSET_STORAGE_FILE_FILENAME_DOC = "File to store offset data in";
 
     /**
      * <code>offset.storage.topic</code>
@@ -52,7 +54,12 @@ public class ConnectConfig extends WorkerConfig {
                 (short) 3,
                 REPLICATION_FACTOR_VALIDATOR,
                 ConfigDef.Importance.LOW,
-                OFFSET_STORAGE_REPLICATION_FACTOR_CONFIG_DOC);
+                OFFSET_STORAGE_REPLICATION_FACTOR_CONFIG_DOC)
+            .define(OFFSET_STORAGE_FILE_FILENAME_CONFIG,
+                ConfigDef.Type.STRING,
+                "",
+                ConfigDef.Importance.HIGH,
+                OFFSET_STORAGE_FILE_FILENAME_DOC);
     }
 
     public ConnectConfig(Map<String, String> props) {

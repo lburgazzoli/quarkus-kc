@@ -14,6 +14,7 @@ public interface ApplicationConfig {
     Map<String, Connector> connectors();
 
     interface Connector {
-        Map<String, String> params();
+        String type();
+        Map<String, String> config();
     }
 }

@@ -6,8 +6,14 @@ import java.util.Map;
 import javax.enterprise.inject.Produces;
 import javax.inject.Singleton;
 
+import org.apache.kafka.common.utils.Time;
+import org.apache.kafka.connect.connector.policy.AllConnectorClientConfigOverridePolicy;
+import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
+import org.apache.kafka.connect.runtime.Worker;
 import org.apache.kafka.connect.runtime.WorkerConfig;
+import org.apache.kafka.connect.runtime.isolation.Plugins;
 import org.apache.kafka.connect.runtime.rest.RestServer;
+import org.apache.kafka.connect.storage.FileOffsetBackingStore;
 import org.apache.kafka.connect.storage.KafkaOffsetBackingStore;
 import org.apache.kafka.connect.storage.OffsetBackingStore;
 import org.apache.kafka.connect.util.SharedTopicAdmin;
@@ -24,23 +30,58 @@ public class ApplicationProducers {
     @Produces
     @Singleton
     public OffsetBackingStore offsetStore(ApplicationConfig appConfig, WorkerConfig config) {
-        Map<String, Object> adminProps = new HashMap<>(config.originals());
-        adminProps.put(CLIENT_ID_CONFIG, appConfig.id() + "-admin");
+        OffsetBackingStore store;
 
-        SharedTopicAdmin admin = new SharedTopicAdmin(adminProps);
+        String path = config.getString(ConnectConfig.OFFSET_STORAGE_FILE_FILENAME_CONFIG);
+        if (path != null && !path.isEmpty()) {
+            store = new FileOffsetBackingStore();
+        } else {
+            Map<String, Object> adminProps = new HashMap<>(config.originals());
+            adminProps.put(CLIENT_ID_CONFIG, appConfig.id() + "-admin");
 
-        KafkaOffsetBackingStore store = new KafkaOffsetBackingStore(admin,appConfig::id);
+            SharedTopicAdmin admin = new SharedTopicAdmin(adminProps);
+
+            store = new KafkaOffsetBackingStore(admin);
+        }
+
         store.configure(config);
 
         return store;
+
     }
 
     @Produces
     @Singleton
     public RestServer restServer(WorkerConfig config) {
-        RestServer rest = new RestServer(config, null);
+        RestServer rest = new RestServer(config);
         rest.initializeServer();
 
         return rest;
+    }
+
+    @Produces
+    @Singleton
+    public ConnectorClientConfigOverridePolicy overridePolicy() {
+        return new AllConnectorClientConfigOverridePolicy();
+    }
+
+    @Produces
+    @Singleton
+    public Worker worker(
+        ApplicationConfig appConfig,
+        WorkerConfig config,
+        OffsetBackingStore offsetStore,
+        ConnectorClientConfigOverridePolicy overridePolicy) {
+
+        Plugins plugins = new Plugins(appConfig.worker());
+        plugins.compareAndSwapWithDelegatingLoader();
+
+        return new Worker(
+            appConfig.id(),
+            Time.SYSTEM,
+            plugins,
+            config,
+            offsetStore,
+            overridePolicy);
     }
 }

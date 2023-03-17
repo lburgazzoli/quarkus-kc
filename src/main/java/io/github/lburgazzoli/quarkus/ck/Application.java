@@ -1,19 +1,23 @@
 package io.github.lburgazzoli.quarkus.ck;
 
 
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import javax.inject.Inject;
 
-import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
 import org.apache.kafka.connect.runtime.Connect;
+import org.apache.kafka.connect.runtime.ConnectorConfig;
 import org.apache.kafka.connect.runtime.Herder;
 import org.apache.kafka.connect.runtime.Worker;
 import org.apache.kafka.connect.runtime.WorkerConfig;
-import org.apache.kafka.connect.runtime.isolation.Plugins;
 import org.apache.kafka.connect.runtime.rest.RestServer;
 import org.apache.kafka.connect.runtime.rest.entities.ConnectorInfo;
 import org.apache.kafka.connect.runtime.standalone.StandaloneHerder;
-import org.apache.kafka.connect.storage.OffsetBackingStore;
+import org.apache.kafka.connect.util.ConnectUtils;
 import org.apache.kafka.connect.util.FutureCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,59 +35,51 @@ public class Application implements QuarkusApplication {
     @Inject
     WorkerConfig config;
     @Inject
-    OffsetBackingStore offsetStore;
-    @Inject
     RestServer restServer;
+    @Inject
+    ConnectorClientConfigOverridePolicy overridePolicy;
+    @Inject
+    Worker worker;
+
 
     @Override
     public int run(String... args) throws Exception {
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+
         try {
-            LOGGER.info("Kafka Connect standalone worker initializing ...");
-            LOGGER.info("Scanning for plugin classes. This might take a moment ...");
+            final Herder herder = new StandaloneHerder(worker, ConnectUtils.lookupKafkaClusterId(config), overridePolicy) {
+                @Override
+                public synchronized void start() {
+                    executor.submit(super::start);
+                }
+            };
 
-            Plugins plugins = new Plugins(appConfig.worker());
-            plugins.compareAndSwapWithDelegatingLoader();
-
-            String kafkaClusterId = config.kafkaClusterId();
-            LOGGER.debug("Kafka cluster ID: {}", kafkaClusterId);\
-
-            ConnectorClientConfigOverridePolicy connectorClientConfigOverridePolicy = plugins.newPlugin(
-                config.getString(WorkerConfig.CONNECTOR_CLIENT_POLICY_CLASS_CONFIG),
-                config,
-                ConnectorClientConfigOverridePolicy.class);
-
-            Worker worker = new Worker(
-                appConfig.id(),
-                Time.SYSTEM,
-                plugins,
-                config,
-                offsetStore,
-                connectorClientConfigOverridePolicy);
-
-            final Herder herder = new StandaloneHerder(worker, kafkaClusterId, connectorClientConfigOverridePolicy);
             final Connect connect = new Connect(herder, restServer);
 
             try {
                 connect.start();
 
                 if (appConfig.connectors() != null){
-
                     for (var entry: appConfig.connectors().entrySet()) {
                         FutureCallback<Herder.Created<ConnectorInfo>> cb = new FutureCallback<>((error, info) -> {
                             if (error != null) {
-                                LOGGER.error("Failed to create job for {}", entry.getKey());
+                                LOGGER.error("Failed to create job for {}", entry.getKey(), error);
                             } else {
                                 LOGGER.info("Created connector {}", info.result().name());
                             }
                         });
 
+                        Map<String, String> connectorConfig = new TreeMap<>(entry.getValue().config());
+                        connectorConfig.put(ConnectorConfig.NAME_CONFIG, entry.getKey());
+                        connectorConfig.put(ConnectorConfig.CONNECTOR_CLASS_CONFIG, entry.getValue().type());
+
+                        LOGGER.info("Creating connector {}", entry.getKey());
+
                         herder.putConnectorConfig(
                             entry.getKey(),
-                            entry.getValue().params(),
+                            connectorConfig,
                             false,
                             cb);
-                        cb.get();
-
                     }
                 }
             } catch (Throwable t) {
@@ -97,6 +93,8 @@ public class Application implements QuarkusApplication {
         } catch (Throwable t) {
             LOGGER.error("Stopping due to error", t);
             return 2;
+        } finally {
+            executor.shutdownNow();
         }
 
         return 0;

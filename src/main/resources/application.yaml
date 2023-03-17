@@ -1,9 +1,49 @@
+quarkus:
+  log:
+    level: INFO
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c] (%t) %s%e%n"
+    category:
+      "org.reflections":
+        level: ERROR
+      "io.github.lburgazzoli.quarkus.ck.ConnectConfig":
+        level: ERROR
+      "org.apache.kafka.clients.admin.AdminClientConfig":
+        level: ERROR
+      "org.apache.kafka.connect.runtime.SourceConnectorConfig":
+        level: ERROR
+      "org.apache.kafka.connect.runtime.ConnectorConfig$EnrichedConnectorConfig":
+        level: ERROR
+      "org.apache.kafka.connect.json.JsonConverterConfig":
+        level: ERROR
+      "org.apache.kafka.connect.runtime.WorkerConfig":
+        level: ERROR
+      "org.apache.kafka.clients.producer.ProducerConfig":
+        level: ERROR
+      "org.apache.kafka.clients.consumer.ConsumerConfig":
+        level: ERROR
+
+
 kc:
-  id: "${quarkus.uuid}"
+  id: "${worker.id}"
   worker:
-    bootstrap.servers: localhost:9092
+    bootstrap.servers: '127.0.0.1:56252,127.0.0.1:56263,127.0.0.1:56261'
+    #security.protocol: "SASL_SSL"
+    #sasl.mechanism: "PLAIN"
+    #sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${kafka.username}" password="${kafka.password}";'
     key.converter: org.apache.kafka.connect.json.JsonConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter
+    #offset.storage.file.filename: "/tmp/${worker.id}-offset.txt"
     offset.flush.interval.ms: 10000
-    offset.storage.topic: "foo"
-
+    offset.storage.topic: "${worker.id}-offset"
+  connectors:
+    debezium:
+      type: "io.debezium.connector.postgresql.PostgresConnector"
+      config:
+        tasks: 1
+        tasks.max: 1
+        topic.prefix: "${worker.id}_"
+        database.hostname: "localhost"
+        database.user: "postgres"
+        database.password: "postgres"
+        database.dbname: "postgres"
