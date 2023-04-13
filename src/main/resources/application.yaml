@@ -30,9 +30,11 @@ quarkus:
 
 kc:
   id: "${worker.id}"
+  prometheus:
+    config: "etc/kafka_connect_metrics.yaml"
   worker:
     # rpk container start --nodes 3
-    bootstrap.servers: '127.0.0.1:56252,127.0.0.1:56263,127.0.0.1:56261'
+    bootstrap.servers: '127.0.0.1:56697,127.0.0.1:56694,127.0.0.1:56687'
     #security.protocol: "SASL_SSL"
     #sasl.mechanism: "PLAIN"
     #sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${kafka.username}" password="${kafka.password}";'

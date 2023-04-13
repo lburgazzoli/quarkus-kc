@@ -1,11 +1,8 @@
 package io.github.lburgazzoli.quarkus.ck;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import javax.enterprise.inject.Produces;
-import javax.inject.Singleton;
-
+import io.prometheus.client.CollectorRegistry;
+import io.prometheus.jmx.JmxCollector;
+import io.quarkus.arc.Unremovable;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.connector.policy.AllConnectorClientConfigOverridePolicy;
 import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
@@ -18,6 +15,13 @@ import org.apache.kafka.connect.storage.KafkaOffsetBackingStore;
 import org.apache.kafka.connect.storage.OffsetBackingStore;
 import org.apache.kafka.connect.util.SharedTopicAdmin;
 
+import javax.enterprise.inject.Produces;
+import javax.inject.Singleton;
+import javax.management.MalformedObjectNameException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.apache.kafka.clients.admin.AdminClientConfig.CLIENT_ID_CONFIG;
 
 public class ApplicationProducers {
@@ -25,6 +29,18 @@ public class ApplicationProducers {
     @Singleton
     public WorkerConfig config(ApplicationConfig config) {
         return new ConnectConfig(config.worker());
+    }
+
+    @Unremovable
+    @Produces
+    @Singleton
+    public CollectorRegistry collectorRegistry(ApplicationConfig config)
+            throws MalformedObjectNameException, IOException {
+
+        CollectorRegistry registry = new CollectorRegistry(true);
+        registry.register(new JmxCollector(config.prometheus().config(), JmxCollector.Mode.AGENT));
+
+        return registry;
     }
 
     @Produces

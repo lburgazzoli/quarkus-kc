@@ -1,8 +1,9 @@
 package io.github.lburgazzoli.quarkus.ck;
 
-import java.util.Map;
-
 import io.smallrye.config.ConfigMapping;
+
+import java.io.File;
+import java.util.Map;
 
 @ConfigMapping(prefix = "kc")
 public interface ApplicationConfig {
@@ -16,5 +17,11 @@ public interface ApplicationConfig {
     interface Connector {
         String type();
         Map<String, String> config();
+    }
+
+    Prometheus prometheus();
+
+    interface Prometheus {
+        File config();
     }
 }
