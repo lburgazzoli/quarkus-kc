@@ -1,30 +1,21 @@
 package io.github.lburgazzoli.quarkus.ck;
 
 
-import java.util.Map;
-import java.util.TreeMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import javax.inject.Inject;
-
-import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
+import io.quarkus.runtime.Quarkus;
+import io.quarkus.runtime.QuarkusApplication;
+import io.quarkus.runtime.annotations.QuarkusMain;
 import org.apache.kafka.connect.runtime.Connect;
 import org.apache.kafka.connect.runtime.ConnectorConfig;
 import org.apache.kafka.connect.runtime.Herder;
-import org.apache.kafka.connect.runtime.Worker;
-import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.runtime.rest.RestServer;
 import org.apache.kafka.connect.runtime.rest.entities.ConnectorInfo;
-import org.apache.kafka.connect.runtime.standalone.StandaloneHerder;
-import org.apache.kafka.connect.util.ConnectUtils;
 import org.apache.kafka.connect.util.FutureCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.quarkus.runtime.Quarkus;
-import io.quarkus.runtime.QuarkusApplication;
-import io.quarkus.runtime.annotations.QuarkusMain;
+import javax.inject.Inject;
+import java.util.Map;
+import java.util.TreeMap;
 
 @QuarkusMain
 public class Application implements QuarkusApplication {
@@ -33,26 +24,14 @@ public class Application implements QuarkusApplication {
     @Inject
     ApplicationConfig appConfig;
     @Inject
-    WorkerConfig config;
-    @Inject
     RestServer restServer;
     @Inject
-    ConnectorClientConfigOverridePolicy overridePolicy;
-    @Inject
-    Worker worker;
+    Herder herder;
 
     @Override
     public int run(String... args) throws Exception {
-        ExecutorService executor = Executors.newFixedThreadPool(10);
 
         try {
-            final Herder herder = new StandaloneHerder(worker, ConnectUtils.lookupKafkaClusterId(config), overridePolicy) {
-                @Override
-                public synchronized void start() {
-                    executor.submit(super::start);
-                }
-            };
-
             final Connect connect = new Connect(herder, restServer);
 
             try {
@@ -94,8 +73,6 @@ public class Application implements QuarkusApplication {
         } catch (Throwable t) {
             LOGGER.error("Stopping due to error", t);
             return 2;
-        } finally {
-            executor.shutdownNow();
         }
 
         return 0;

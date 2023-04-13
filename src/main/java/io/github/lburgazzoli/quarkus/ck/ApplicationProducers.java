@@ -6,14 +6,18 @@ import io.quarkus.arc.Unremovable;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.connect.connector.policy.AllConnectorClientConfigOverridePolicy;
 import org.apache.kafka.connect.connector.policy.ConnectorClientConfigOverridePolicy;
+import org.apache.kafka.connect.runtime.Herder;
 import org.apache.kafka.connect.runtime.Worker;
 import org.apache.kafka.connect.runtime.WorkerConfig;
 import org.apache.kafka.connect.runtime.isolation.Plugins;
 import org.apache.kafka.connect.runtime.rest.RestServer;
+import org.apache.kafka.connect.runtime.standalone.StandaloneHerder;
 import org.apache.kafka.connect.storage.FileOffsetBackingStore;
 import org.apache.kafka.connect.storage.KafkaOffsetBackingStore;
 import org.apache.kafka.connect.storage.OffsetBackingStore;
+import org.apache.kafka.connect.util.ConnectUtils;
 import org.apache.kafka.connect.util.SharedTopicAdmin;
+import org.eclipse.microprofile.context.ManagedExecutor;
 
 import javax.enterprise.inject.Produces;
 import javax.inject.Singleton;
@@ -31,6 +35,14 @@ public class ApplicationProducers {
         return new ConnectConfig(config.worker());
     }
 
+    /**
+     * Exposes metrics as part of standard Quarkus' metrics endpoint http://localhost:8080/q/metrics.
+     *
+     * @param config the application config
+     * @return a {@link CollectorRegistry} instance
+     * @throws MalformedObjectNameException
+     * @throws IOException
+     */
     @Unremovable
     @Produces
     @Singleton
@@ -43,16 +55,23 @@ public class ApplicationProducers {
         return registry;
     }
 
+    /**
+     * Allow to configure either a file based or kafka based store for offsets
+     *
+     * @param appConfig the application config
+     * @param workerConfig the worker config
+     * @return a {@link OffsetBackingStore} instance
+     */
     @Produces
     @Singleton
-    public OffsetBackingStore offsetStore(ApplicationConfig appConfig, WorkerConfig config) {
+    public OffsetBackingStore offsetStore(ApplicationConfig appConfig, WorkerConfig workerConfig) {
         OffsetBackingStore store;
 
-        String path = config.getString(ConnectConfig.OFFSET_STORAGE_FILE_FILENAME_CONFIG);
+        String path = workerConfig.getString(ConnectConfig.OFFSET_STORAGE_FILE_FILENAME_CONFIG);
         if (path != null && !path.isEmpty()) {
             store = new FileOffsetBackingStore();
         } else {
-            Map<String, Object> adminProps = new HashMap<>(config.originals());
+            Map<String, Object> adminProps = new HashMap<>(workerConfig.originals());
             adminProps.put(CLIENT_ID_CONFIG, appConfig.id() + "-admin");
 
             SharedTopicAdmin admin = new SharedTopicAdmin(adminProps);
@@ -60,7 +79,7 @@ public class ApplicationProducers {
             store = new KafkaOffsetBackingStore(admin);
         }
 
-        store.configure(config);
+        store.configure(workerConfig);
 
         return store;
 
@@ -69,8 +88,16 @@ public class ApplicationProducers {
     @Produces
     @Singleton
     public RestServer restServer(WorkerConfig config) {
-        RestServer rest = new RestServer(config);
-        rest.initializeServer();
+        // if only the RestServer were an interface ...
+        RestServer rest = new RestServer(config) {
+            @Override
+            public void initializeResources(Herder herder) {
+                // do nothing
+            }
+        };
+
+        // do not start the rest server as connectors are exposed by quarkus
+        // rest.initializeServer();
 
         return rest;
     }
@@ -89,6 +116,7 @@ public class ApplicationProducers {
         OffsetBackingStore offsetStore,
         ConnectorClientConfigOverridePolicy overridePolicy) {
 
+        // if only Plugins were an interface ...
         Plugins plugins = new Plugins(appConfig.worker());
         plugins.compareAndSwapWithDelegatingLoader();
 
@@ -99,5 +127,20 @@ public class ApplicationProducers {
             config,
             offsetStore,
             overridePolicy);
+    }
+
+    @Produces
+    @Singleton
+    public Herder herder(
+            Worker worker,
+            WorkerConfig config,
+            ManagedExecutor executor) {
+
+        return new StandaloneHerder(worker, ConnectUtils.lookupKafkaClusterId(config), new AllConnectorClientConfigOverridePolicy()) {
+            @Override
+            public synchronized void start() {
+                executor.submit(super::start);
+            }
+        };
     }
 }

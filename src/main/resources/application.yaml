@@ -34,16 +34,25 @@ kc:
     config: "etc/kafka_connect_metrics.yaml"
   worker:
     # rpk container start --nodes 3
-    bootstrap.servers: '127.0.0.1:56697,127.0.0.1:56694,127.0.0.1:56687'
+    bootstrap.servers: '127.0.0.1:50438,127.0.0.1:50440,127.0.0.1:50446'
+
+    # secured login
     #security.protocol: "SASL_SSL"
     #sasl.mechanism: "PLAIN"
     #sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${kafka.username}" password="${kafka.password}";'
+
     key.converter: org.apache.kafka.connect.json.JsonConverter
     value.converter: org.apache.kafka.connect.json.JsonConverter
-    #offset.storage.file.filename: "/tmp/${worker.id}-offset.txt"
+
     offset.flush.interval.ms: 10000
-    offset.storage.topic: "${worker.id}-offset"
-    topic.creation.default.replication.factor: -1
+
+    # to configure file based offset storage:
+    #offset.storage.file.filename: "/tmp/${worker.id}-offset.txt"
+
+    # to configure kafka based offset storage:
+    offset.storage.topic: "${kc.id}-offset"
+
+    topic.creation.default.replication.factor: 3
     topic.creation.default.partitions: -1
     topic.creation.default.cleanup.policy: "compact"
     topic.creation.default.delete.retention.ms: 2678400000
@@ -54,12 +63,8 @@ kc:
       config:
         tasks: 1
         tasks.max: 1
-        topic.prefix: "${worker.id}_"
+        topic.prefix: "${kc.id}_pg"
         database.hostname: "localhost"
         database.user: "postgres"
         database.password: "postgres"
         database.dbname: "postgres"
-        topic.creation.default.replication.factor: -1
-        topic.creation.default.partitions: -1
-        topic.creation.default.cleanup.policy: "compact"
-        topic.creation.default.delete.retention.ms: 2678400000
